@@ -217,9 +217,6 @@ static void scanThread(void* param) {
         goto EXIT;
     }
 
-    //esp_wifi_restore();
-    // esp_wifi_disconnect();
-    // esp_wifi_scan_stop();
     if (esp_wifi_set_mode(WIFI_MODE_STA) != ESP_OK) {
         LE(TAG, "scan failed!set mode failed");
         goto EXIT;
