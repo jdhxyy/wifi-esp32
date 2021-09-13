@@ -1,4 +1,4 @@
-// Copyright 2021-2021 The jdh99 Authors. All rights reserved.
+// Copyright 2021-2021 The SUMEC Authors. All rights reserved.
 // esp32的WIFI驱动
 // Authors: jdh99 <jdh821@163.com>
 
@@ -25,16 +25,16 @@
 // WifiApInfo ap信息
 typedef struct {
     // ap的MAC地址
-    uint8_t bssid[WIFI_BSSID_LEN];
-    uint8_t ssid[WIFI_SSID_LEN_MAX];
-    uint8_t channel;
-    int8_t rssi;
+    uint8_t Bssid[WIFI_BSSID_LEN];
+    uint8_t Ssid[WIFI_SSID_LEN_MAX];
+    uint8_t Channel;
+    int8_t Rssi;
     // 加密算法
-    wifi_auth_mode_t authmode;
+    wifi_auth_mode_t Authmode;
     // 成对密码套件
-    wifi_cipher_type_t pairwise_cipher;
+    wifi_cipher_type_t PairwiseCipher;
     // 组播加密套件
-    wifi_cipher_type_t group_cipher;
+    wifi_cipher_type_t GroupCipher;
 } WifiApInfo;
 
 // WifiConnectInfo wifi连接信息

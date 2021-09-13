@@ -1,4 +1,4 @@
-// Copyright 2021-2021 The jdh99 Authors. All rights reserved.
+// Copyright 2021-2021 The SUMEC Authors. All rights reserved.
 // esp32µÄWIFIÇý¶¯
 // Authors: jdh99 <jdh821@163.com>
 
@@ -262,13 +262,13 @@ static void scanThread(void* param) {
     }
 
     for (int i = 0; i < apCount; i++) {
-        memcpy(scanApInfo[i].bssid, apInfo[i].bssid, WIFI_BSSID_LEN);
-        memcpy(scanApInfo[i].ssid, apInfo[i].ssid, WIFI_SSID_LEN_MAX);
-        scanApInfo[i].rssi = apInfo[i].rssi;
-        scanApInfo[i].channel = apInfo[i].primary;
-        scanApInfo[i].authmode = apInfo[i].authmode;
-        scanApInfo[i].pairwise_cipher = apInfo[i].pairwise_cipher;
-        scanApInfo[i].group_cipher = apInfo[i].group_cipher;
+        memcpy(scanApInfo[i].Bssid, apInfo[i].bssid, WIFI_BSSID_LEN);
+        memcpy(scanApInfo[i].Ssid, apInfo[i].ssid, WIFI_SSID_LEN_MAX);
+        scanApInfo[i].Rssi = apInfo[i].rssi;
+        scanApInfo[i].Channel = apInfo[i].primary;
+        scanApInfo[i].Authmode = apInfo[i].authmode;
+        scanApInfo[i].PairwiseCipher = apInfo[i].pairwise_cipher;
+        scanApInfo[i].GroupCipher = apInfo[i].group_cipher;
     }
     scanApNum = apCount;
 
