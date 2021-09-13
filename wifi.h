@@ -1,4 +1,4 @@
-// Copyright 2021-2021 The SUMEC Authors. All rights reserved.
+// Copyright 2021-2021 The jdh99 Authors. All rights reserved.
 // esp32µÄWIFIÇý¶¯
 // Authors: jdh99 <jdh821@163.com>
 
