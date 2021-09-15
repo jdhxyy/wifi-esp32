@@ -41,8 +41,8 @@ typedef struct {
 typedef struct {
     char Ssid[WIFI_SSID_LEN_MAX];
     char Pwd[WIFI_PWD_LEN_MAX];
-    uint8_t IP[4];
-    uint8_t Gateway[4];
+    uint32_t IP;
+    uint32_t Gateway;
 } WifiConnectInfo;
 
 // WifiScanResultFunc É¨Ãè½á¹û

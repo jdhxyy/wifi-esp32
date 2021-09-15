@@ -170,16 +170,10 @@ static void eventHandler(void* arg, esp_event_base_t eventBase, int32_t eventID,
         retryNum = 0;
         isConnect = true;
 
-        for (int i = 0; i < 4; i++) {
-            connectInfo.IP[i] = event->ip_info.ip.addr >> (i * 8);
-            connectInfo.Gateway[i] = event->ip_info.gw.addr >> (i * 8);
-        }
+        connectInfo.IP = ntohl(event->ip_info.ip.addr);
+        connectInfo.Gateway = ntohl(event->ip_info.gw.addr);
 
-        LI(TAG, "connect success.ip:%d.%d.%d.%d gw:%d.%d.%d.%d", 
-            connectInfo.IP[0], connectInfo.IP[1], 
-            connectInfo.IP[2], connectInfo.IP[3], 
-            connectInfo.Gateway[0], connectInfo.Gateway[1], 
-            connectInfo.Gateway[2], connectInfo.Gateway[3]);
+        LI(TAG, "connect success.ip:0x%x gw:0x%x", connectInfo.IP, connectInfo.Gateway);
         isHaveConnectResult = true;
         xEventGroupSetBits(wifiEventGroup, WIFI_CONNECTED_BIT);
     }
