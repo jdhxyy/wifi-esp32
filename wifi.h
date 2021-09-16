@@ -53,6 +53,7 @@ typedef void (*WifiScanResultFunc)(WifiApInfo* apInfo, int len);
 typedef void (*WifiConnectResultFunc)(bool result);
 
 // WifiLoad 模块载入
+// 载入之前需初始化nvs_flash_init,esp_netif_init,esp_event_loop_create_default
 bool WifiLoad(void);
 
 // WifiIsBusy 是否忙碌

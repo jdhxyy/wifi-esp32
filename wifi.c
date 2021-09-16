@@ -24,6 +24,9 @@
 #define SCAN_THREAD_SIZE 4096
 #define CONNECT_THREAD_SIZE 4096
 
+// tzmalloc字节数
+#define MALLOC_TOTAL 2048
+
 #define WIFI_CONNECTED_BIT BIT0
 #define WIFI_FAIL_BIT BIT1
 
@@ -56,23 +59,13 @@ static void scanThread(void* param);
 static void connectThread(void* param);
 
 // WifiLoad 模块载入
+// 载入之前需初始化nvs_flash_init,esp_netif_init,esp_event_loop_create_default
 bool WifiLoad(void) {
-    mid = TZMallocRegister(0, "wifi", 2048);
+    mid = TZMallocRegister(0, "wifi", MALLOC_TOTAL);
     if (mid == -1) {
         return false;
     }
 
-    esp_err_t ret = nvs_flash_init();
-    if (ret != ESP_OK) {
-        return false;
-    }
-
-    if (esp_netif_init() != ESP_OK) {
-        return false;
-    }
-    if (esp_event_loop_create_default() != ESP_OK) {
-        return false;
-    }
     esp_netif_t *sta_netif = esp_netif_create_default_wifi_sta();
     if (sta_netif == NULL) {
         return false;
