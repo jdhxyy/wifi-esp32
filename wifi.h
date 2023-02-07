@@ -76,6 +76,9 @@ bool WifiIsConnect(void);
 // 如果未连接则返回NULL
 WifiConnectInfo* WifiGetConnectInfo(void);
 
+// WifiGetRssi 获取wifi的rssi
+int8_t WifiGetRssi(void);
+
 // WifiSetCallbackScanResult 设置扫描回调
 void WifiSetCallbackScanResult(WifiScanResultFunc func);
 
