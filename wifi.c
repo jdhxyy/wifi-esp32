@@ -32,6 +32,7 @@
 
 static int mid = -1;
 
+static bool isStart = false;
 static bool isBusy = false;
 static bool isWifiStart = false;
 
@@ -95,6 +96,9 @@ bool WifiLoad(void) {
     if (AsyncStart(task, TASK_INTERVAL * ASYNC_MILLISECOND) == false) {
         return false;
     }
+
+    isStart = true;
+
     return true;
 }
 
@@ -176,12 +180,17 @@ static void eventHandler(void* arg, esp_event_base_t eventBase, int32_t eventID,
 
 // WifiIsBusy 是否忙碌
 bool WifiIsBusy(void) {
-    return isBusy;
+    return (isBusy & isStart);
 }
 
 // WifiScan 启动扫描热点
 // 返回false说明驱动正忙
 bool WifiScan(void) {
+    if (isStart == false) {
+        LW(TAG, "wifi not start!");
+        return false;
+    }
+
     if (isBusy) {
         LW(TAG, "wifi scan failed,because is busy!");
         return false;
@@ -269,6 +278,11 @@ EXIT:
 
 // WifiConnect 启动连接热点
 bool WifiConnect(char* ssid, char* pwd) {
+    if (isStart == false) {
+        LW(TAG, "wifi not start!");
+        return false;
+    }
+    
     if (isBusy) {
         LW(TAG, "connect start failed!is busy");
         return false;
