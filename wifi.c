@@ -52,6 +52,8 @@ static EventGroupHandle_t wifiEventGroup;
 static WifiScanResultFunc scanResultCallback = NULL;
 static WifiConnectResultFunc connectResultCallback = NULL;
 
+static wifi_ap_record_t apInfo;
+
 static int task(void);
 static void eventHandler(void* arg, esp_event_base_t eventBase, int32_t eventID, 
     void* eventData);
@@ -394,4 +396,15 @@ void WifiSetCallbackScanResult(WifiScanResultFunc func) {
 // WifiSetCallbackConnectResult 设置连接回调
 void WifiSetCallbackConnectResult(WifiConnectResultFunc func) {
     connectResultCallback = func;
+}
+
+// WifiGetRssi 获取wifi的rssi
+int8_t WifiGetRssi(void) {
+    if (isConnect == false) {
+        return 0;
+    }
+
+    esp_wifi_sta_get_ap_info(&apInfo);
+
+    return apInfo.rssi;
 }
