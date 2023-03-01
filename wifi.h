@@ -5,8 +5,8 @@
 #ifndef WIFI_H
 #define WIFI_H
 
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #include "esp_wifi.h"
 
@@ -41,13 +41,14 @@ typedef struct {
 typedef struct {
     char Ssid[WIFI_SSID_LEN_MAX];
     char Pwd[WIFI_PWD_LEN_MAX];
+    wifi_auth_mode_t Authmode;
     uint32_t IP;
     uint32_t Gateway;
 } WifiConnectInfo;
 
 // WifiScanResultFunc 扫描结果
 // 扫描失败apInfo为NULL,len为0
-typedef void (*WifiScanResultFunc)(WifiApInfo* apInfo, int len);
+typedef void (*WifiScanResultFunc)(WifiApInfo *apInfo, int len);
 
 // WifiConnectResultFunc 连接结果
 typedef void (*WifiConnectResultFunc)(bool result);
@@ -64,7 +65,7 @@ bool WifiIsBusy(void);
 bool WifiScan(void);
 
 // WifiConnect 启动连接热点
-bool WifiConnect(char* ssid, char* pwd);
+bool WifiConnect(char *ssid, char *pwd, wifi_auth_mode_t authMode);
 
 // WifiDisconnect 断开连接
 void WifiDisconnect(void);
@@ -74,7 +75,7 @@ bool WifiIsConnect(void);
 
 // WifiGetConnectInfo 读取当前已连接的信息
 // 如果未连接则返回NULL
-WifiConnectInfo* WifiGetConnectInfo(void);
+WifiConnectInfo *WifiGetConnectInfo(void);
 
 // WifiGetRssi 获取wifi的rssi
 int8_t WifiGetRssi(void);
