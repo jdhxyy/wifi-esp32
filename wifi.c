@@ -277,7 +277,7 @@ EXIT:
 }
 
 // WifiConnect 启动连接热点
-bool WifiConnect(char* ssid, char* pwd) {
+bool WifiConnect(char* ssid, char* pwd, wifi_auth_mode_t authMode) {
     if (isStart == false) {
         LW(TAG, "wifi not start!");
         return false;
@@ -304,6 +304,7 @@ bool WifiConnect(char* ssid, char* pwd) {
     LI(TAG, "connect start");
     strcpy(connectInfo.Ssid, ssid);
     strcpy(connectInfo.Pwd, pwd);
+    connectInfo.Authmode = authMode;
 
     isBusy = true;
     isStartConnect = true;
@@ -326,7 +327,7 @@ static void connectThread(void* param) {
 
     wifi_config_t wifiConfig = {
         .sta = {
-            .threshold.authmode = WIFI_AUTH_WPA2_PSK,
+            .threshold.authmode = connectInfo.Authmode,
             .pmf_cfg = {
                 .capable = true,
                 .required = false
@@ -334,7 +335,9 @@ static void connectThread(void* param) {
         },
     };
     strcpy((char*)wifiConfig.sta.ssid, connectInfo.Ssid);
-    strcpy((char*)wifiConfig.sta.password, connectInfo.Pwd);
+    if (connectInfo.Authmode != WIFI_AUTH_OPEN) {
+        strcpy((char *)wifiConfig.sta.password, connectInfo.Pwd);
+    }
     if (esp_wifi_set_config(WIFI_IF_STA, &wifiConfig) != ESP_OK) {
         LE(TAG, "connect failed!set config failed");
         goto EXIT;
