@@ -371,10 +371,13 @@ EXIT:
 
 // WifiDisconnect 断开连接
 void WifiDisconnect(void) {
-    if (isConnect) {
+    if (isConnect == false || isStart == false) {
         return;
     }
-    WifiDisconnect();
+
+    esp_wifi_disconnect();
+    memset(&connectInfo, 0, sizeof(connectInfo));
+    isConnect = false;
 }
 
 // WifiIsConnect 是否已连接
