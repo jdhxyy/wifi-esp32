@@ -80,6 +80,9 @@ WifiConnectInfo *WifiGetConnectInfo(void);
 // WifiGetRssi 获取wifi的rssi
 int8_t WifiGetRssi(void);
 
+// WifiGetMac 获取mac地址
+void WifiGetMac(uint8_t mac[6]);
+
 // WifiSetCallbackScanResult 设置扫描回调
 void WifiSetCallbackScanResult(WifiScanResultFunc func);
 
