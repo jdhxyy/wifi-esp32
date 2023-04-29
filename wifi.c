@@ -116,7 +116,7 @@ static int task(void) {
     if (isHaveScanResult) {
         isBusy = false;
         if (scanResultCallback != NULL) {
-            LI(TAG, "push scan result.ap num:%d", scanApNum);
+            LD(TAG, "push scan result.ap num:%d", scanApNum);
             scanResultCallback(scanApInfo, scanApNum);
         }
         if (scanApInfo != NULL) {
@@ -143,9 +143,9 @@ static void eventHandler(void *arg, esp_event_base_t eventBase, int32_t eventID,
                          void *eventData) {
     static int retryNum = 0;
 
-    LI(TAG, "event base:%s,id:%d", eventBase, eventID);
+    LD(TAG, "event base:%s,id:%d", eventBase, eventID);
     if (eventBase == WIFI_EVENT && eventID == WIFI_EVENT_STA_START && isStartConnect) {
-        LI(TAG, "wifi connect ap start");
+        LD(TAG, "wifi connect ap start");
         esp_wifi_connect();
         return;
     }
@@ -157,7 +157,7 @@ static void eventHandler(void *arg, esp_event_base_t eventBase, int32_t eventID,
         if (isStartConnect) {
             if (retryNum < WIFI_CONNECT_RETRY_MAX) {
                 retryNum++;
-                LI(TAG, "wifi connect ap retry:%d", retryNum);
+                LD(TAG, "wifi connect ap retry:%d", retryNum);
                 esp_wifi_connect();
             } else {
                 LE(TAG, "wifi connect failed!retry too many");
@@ -233,7 +233,7 @@ static void scanThread(void *param) {
         isWifiStart = true;
     }
 
-    LI(TAG, "wifi scan start");
+    LD(TAG, "wifi scan start");
     esp_wifi_scan_start(NULL, true);
 
     uint16_t number = WIFI_SCAN_LIST_LEN_MAX;
@@ -249,7 +249,7 @@ static void scanThread(void *param) {
         LE(TAG, "scan failed!get ap num failed");
         goto EXIT;
     }
-    LI(TAG, "scan ap num:%d", apCount);
+    LD(TAG, "scan ap num:%d", apCount);
     if (apCount == 0) {
         LE(TAG, "scan failed!get ap num is 0");
         goto EXIT;
