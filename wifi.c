@@ -32,6 +32,9 @@
 
 #define WIFI_MAC_LEN 6
 
+// 支持扫描列表的最大数
+#define SCAN_AP_NUM_MAX 10
+
 static int mid = -1;
 
 static bool isStart = false;
@@ -40,8 +43,8 @@ static bool isWifiStart = false;
 
 // 是否有扫描结果.有则需要推送
 static bool isHaveScanResult = false;
-static WifiApInfo *scanApInfo = NULL;
-static int scanApNum = 0;
+static WifiApInfo gScanApInfo[SCAN_AP_NUM_MAX] = {0};
+static int gScanApNum = 0;
 
 static bool isConnect = false;
 static bool isStartConnect = false;
@@ -116,13 +119,11 @@ static int task(void) {
     if (isHaveScanResult) {
         isBusy = false;
         if (scanResultCallback != NULL) {
-            LD(TAG, "push scan result.ap num:%d", scanApNum);
-            scanResultCallback(scanApInfo, scanApNum);
+            LD(TAG, "push scan result.ap num:%d", gScanApNum);
+            scanResultCallback(gScanApInfo, gScanApNum);
         }
-        if (scanApInfo != NULL) {
-            TZFree(scanApInfo);
-            scanApInfo = NULL;
-            scanApNum = 0;
+        if (gScanApNum > 0) {
+            gScanApNum = 0;
         }
         isHaveScanResult = false;
     }
@@ -204,11 +205,7 @@ bool WifiScan(void) {
 
     isBusy = true;
     isHaveScanResult = false;
-    if (scanApInfo != NULL) {
-        TZFree(scanApInfo);
-        scanApInfo = NULL;
-    }
-    scanApNum = 0;
+    gScanApNum = 0;
 
     LD(TAG, "wifi scan start!create thread to scan");
     BrorThreadCreate(scanThread, "scanThread", BROR_THREAD_PRIORITY_LOWEST, SCAN_THREAD_SIZE);
@@ -259,22 +256,22 @@ static void scanThread(void *param) {
         apCount = WIFI_SCAN_LIST_LEN_MAX;
     }
 
-    scanApInfo = (WifiApInfo *)TZMalloc(mid, sizeof(WifiApInfo) * apCount);
-    if (scanApInfo == NULL) {
-        LE(TAG, "scan failed!malloc failed");
-        goto EXIT;
+    if (apCount >= SCAN_AP_NUM_MAX) {
+        LI(TAG, "scan ap too many:%d", apCount);
+        gScanApNum = SCAN_AP_NUM_MAX;
+    } else {
+        gScanApNum = apCount;
     }
 
-    for (int i = 0; i < apCount; i++) {
-        memcpy(scanApInfo[i].Bssid, apInfo[i].bssid, WIFI_BSSID_LEN);
-        memcpy(scanApInfo[i].Ssid, apInfo[i].ssid, WIFI_SSID_LEN_MAX);
-        scanApInfo[i].Rssi = apInfo[i].rssi;
-        scanApInfo[i].Channel = apInfo[i].primary;
-        scanApInfo[i].Authmode = apInfo[i].authmode;
-        scanApInfo[i].PairwiseCipher = apInfo[i].pairwise_cipher;
-        scanApInfo[i].GroupCipher = apInfo[i].group_cipher;
+    for (int i = 0; i < gScanApNum; i++) {
+        memcpy(gScanApInfo[i].Bssid, apInfo[i].bssid, WIFI_BSSID_LEN);
+        memcpy(gScanApInfo[i].Ssid, apInfo[i].ssid, WIFI_SSID_LEN_MAX);
+        gScanApInfo[i].Rssi = apInfo[i].rssi;
+        gScanApInfo[i].Channel = apInfo[i].primary;
+        gScanApInfo[i].Authmode = apInfo[i].authmode;
+        gScanApInfo[i].PairwiseCipher = apInfo[i].pairwise_cipher;
+        gScanApInfo[i].GroupCipher = apInfo[i].group_cipher;
     }
-    scanApNum = apCount;
 
 EXIT:
     isHaveScanResult = true;
