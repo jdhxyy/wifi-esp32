@@ -70,7 +70,7 @@ static void connectThread(void *param);
 
 // WifiLoad 模块载入
 // 载入之前需初始化nvs_flash_init,esp_netif_init,esp_event_loop_create_default
-bool WifiLoad(void) {
+bool WifiLoad(char *hostname) {
     mid = TZMallocRegister(0, "wifi", MALLOC_TOTAL);
     if (mid == -1) {
         return false;
@@ -84,6 +84,11 @@ bool WifiLoad(void) {
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     if (esp_wifi_init(&cfg) != ESP_OK) {
         return false;
+    }
+
+    // 设置WIFI主机名
+    if (hostname != NULL) {
+        tcpip_adapter_set_hostname(TCPIP_ADAPTER_IF_STA, hostname);
     }
 
     // 事件组.用于连接
