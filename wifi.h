@@ -89,4 +89,8 @@ void WifiSetCallbackScanResult(WifiScanResultFunc func);
 // WifiSetCallbackConnectResult 设置连接回调
 void WifiSetCallbackConnectResult(WifiConnectResultFunc func);
 
+// WifiGetScanHistoryResult 获取历史扫描结果
+// apNum 历史扫描结果的个数
+WifiApInfo *WifiGetScanHistoryResult(uint8_t *apNum);
+
 #endif

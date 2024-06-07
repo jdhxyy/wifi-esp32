@@ -45,6 +45,7 @@ static bool isWifiStart = false;
 static bool isHaveScanResult = false;
 static WifiApInfo gScanApInfo[SCAN_AP_NUM_MAX] = {0};
 static int gScanApNum = 0;
+static int gScanApHistoryNum = 0;
 
 static bool isConnect = false;
 static bool isStartConnect = false;
@@ -278,6 +279,8 @@ static void scanThread(void *param) {
         gScanApInfo[i].GroupCipher = apInfo[i].group_cipher;
     }
 
+    gScanApHistoryNum = gScanApNum;
+
 EXIT:
     isHaveScanResult = true;
     esp_wifi_scan_stop();
@@ -425,4 +428,11 @@ int8_t WifiGetRssi(void) {
 // WifiGetMac 获取mac地址
 void WifiGetMac(uint8_t mac[6]) {
     memcpy(mac, gWifiMac, sizeof(gWifiMac));
+}
+
+// WifiGetScanHistoryResult 获取历史扫描结果
+// apNum 历史扫描结果的个数
+WifiApInfo *WifiGetScanHistoryResult(uint8_t *apNum) {
+    *apNum = gScanApHistoryNum;
+    return gScanApInfo;
 }
