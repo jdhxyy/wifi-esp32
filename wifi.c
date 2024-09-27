@@ -68,6 +68,7 @@ static void eventHandler(void *arg, esp_event_base_t eventBase, int32_t eventID,
 
 static void scanThread(void *param);
 static void connectThread(void *param);
+static bool isRepeat(uint8_t *ssid);
 
 // WifiLoad 模块载入
 // 载入之前需初始化nvs_flash_init,esp_netif_init,esp_event_loop_create_default
@@ -219,6 +220,8 @@ bool WifiScan(void) {
 }
 
 static void scanThread(void *param) {
+    wifi_ap_record_t *apInfo = NULL;
+
     if (scanResultCallback == NULL) {
         LE(TAG, "scan failed!callback is null");
         goto EXIT;
@@ -239,14 +242,6 @@ static void scanThread(void *param) {
     LD(TAG, "wifi scan start");
     esp_wifi_scan_start(NULL, true);
 
-    uint16_t number = WIFI_SCAN_LIST_LEN_MAX;
-    wifi_ap_record_t apInfo[WIFI_SCAN_LIST_LEN_MAX];
-    memset(apInfo, 0, sizeof(apInfo));
-    if (esp_wifi_scan_get_ap_records(&number, apInfo) != ESP_OK) {
-        LE(TAG, "scan failed!get ap records failed");
-        goto EXIT;
-    }
-
     uint16_t apCount = 0;
     if (esp_wifi_scan_get_ap_num(&apCount) != ESP_OK) {
         LE(TAG, "scan failed!get ap num failed");
@@ -258,33 +253,60 @@ static void scanThread(void *param) {
         goto EXIT;
     }
 
-    if (apCount > WIFI_SCAN_LIST_LEN_MAX) {
+    apInfo = (wifi_ap_record_t *)pvPortMalloc(sizeof(wifi_ap_record_t) * apCount);
+    if (apInfo == NULL) {
+        LE(TAG, "scan failed!malloc failed");
+        apInfo = (wifi_ap_record_t *)pvPortMalloc(sizeof(wifi_ap_record_t) * WIFI_SCAN_LIST_LEN_MAX);
+        if (apInfo == NULL) {
+            LE(TAG, "scan failed!malloc failed");
+            goto EXIT;
+        }
         apCount = WIFI_SCAN_LIST_LEN_MAX;
     }
 
-    if (apCount >= SCAN_AP_NUM_MAX) {
-        LI(TAG, "scan ap too many:%d", apCount);
-        gScanApNum = SCAN_AP_NUM_MAX;
-    } else {
-        gScanApNum = apCount;
+    if (esp_wifi_scan_get_ap_records(&apCount, apInfo) != ESP_OK) {
+        LE(TAG, "scan failed!get ap records failed");
+        goto EXIT;
     }
 
-    for (int i = 0; i < gScanApNum; i++) {
-        memcpy(gScanApInfo[i].Bssid, apInfo[i].bssid, WIFI_BSSID_LEN);
-        memcpy(gScanApInfo[i].Ssid, apInfo[i].ssid, WIFI_SSID_LEN_MAX);
-        gScanApInfo[i].Rssi = apInfo[i].rssi;
-        gScanApInfo[i].Channel = apInfo[i].primary;
-        gScanApInfo[i].Authmode = apInfo[i].authmode;
-        gScanApInfo[i].PairwiseCipher = apInfo[i].pairwise_cipher;
-        gScanApInfo[i].GroupCipher = apInfo[i].group_cipher;
+    gScanApNum = 0;
+    for (int i = 0; i < apCount; i++) {
+        if (isRepeat(apInfo[i].ssid) == true) {
+            continue;
+        }
+
+        memcpy(gScanApInfo[gScanApNum].Bssid, apInfo[i].bssid, WIFI_BSSID_LEN);
+        memcpy(gScanApInfo[gScanApNum].Ssid, apInfo[i].ssid, WIFI_SSID_LEN_MAX);
+        gScanApInfo[gScanApNum].Rssi = apInfo[i].rssi;
+        gScanApInfo[gScanApNum].Channel = apInfo[i].primary;
+        gScanApInfo[gScanApNum].Authmode = apInfo[i].authmode;
+        gScanApInfo[gScanApNum].PairwiseCipher = apInfo[i].pairwise_cipher;
+        gScanApInfo[gScanApNum].GroupCipher = apInfo[i].group_cipher;
+        if (++gScanApNum >= SCAN_AP_NUM_MAX) {
+            break;
+        }
     }
 
     gScanApHistoryNum = gScanApNum;
 
 EXIT:
     isHaveScanResult = true;
+    if (apInfo != NULL) {
+        vPortFree(apInfo);
+    }
     esp_wifi_scan_stop();
     BrorThreadDeleteMe();
+
+}
+
+static bool isRepeat(uint8_t *ssid) {
+    for (int j = 0; j < gScanApNum; j++) {
+        if (memcmp(gScanApInfo[j].Ssid, ssid, WIFI_SSID_LEN_MAX) == 0) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 // WifiConnect 启动连接热点
