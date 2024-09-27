@@ -253,20 +253,17 @@ static void scanThread(void *param) {
         goto EXIT;
     }
 
-    
-
     apInfo = (wifi_ap_record_t *)pvPortMalloc(sizeof(wifi_ap_record_t) * apCount);
     if (apInfo == NULL) {
         LE(TAG, "scan failed!malloc failed");
         apInfo = (wifi_ap_record_t *)pvPortMalloc(sizeof(wifi_ap_record_t) * WIFI_SCAN_LIST_LEN_MAX);
+        if (apInfo == NULL) {
+            LE(TAG, "scan failed!malloc failed");
+            goto EXIT;
+        }
         apCount = WIFI_SCAN_LIST_LEN_MAX;
     }
 
-    if (apInfo == NULL) {
-        LE(TAG, "scan failed!malloc failed");
-        goto EXIT;
-    }
-    
     if (esp_wifi_scan_get_ap_records(&apCount, apInfo) != ESP_OK) {
         LE(TAG, "scan failed!get ap records failed");
         goto EXIT;
