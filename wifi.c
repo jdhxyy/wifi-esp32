@@ -296,7 +296,6 @@ EXIT:
     }
     esp_wifi_scan_stop();
     BrorThreadDeleteMe();
-
 }
 
 static bool isRepeat(uint8_t *ssid) {
@@ -329,8 +328,10 @@ bool WifiConnect(char *ssid, char *pwd, wifi_auth_mode_t authMode) {
         return false;
     }
 
-    if (strlen(ssid) >= WIFI_SSID_LEN_MAX || strlen(pwd) >= WIFI_PWD_LEN_MAX) {
-        LW(TAG, "connect start failed!param is wrong");
+    uint8_t ssidLen = strlen(ssid);
+    uint8_t pwdLen = strlen(pwd);
+    if (ssidLen == 0 || ssidLen >= WIFI_SSID_LEN_MAX || pwdLen >= WIFI_PWD_LEN_MAX) {
+        LW(TAG, "connect start failed!ssid or pwd is wrong");
         return false;
     }
 
