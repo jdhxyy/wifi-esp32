@@ -57,9 +57,6 @@ typedef void (*WifiConnectResultFunc)(bool result);
 // 载入之前需初始化nvs_flash_init,esp_netif_init,esp_event_loop_create_default
 bool WifiLoad(char *hostname);
 
-// WifiIsBusy 是否忙碌
-bool WifiIsBusy(void);
-
 // WifiScan 启动扫描热点
 // 返回false说明驱动正忙
 bool WifiScan(void);
@@ -92,5 +89,11 @@ void WifiSetCallbackConnectResult(WifiConnectResultFunc func);
 // WifiGetScanHistoryResult 获取历史扫描结果
 // apNum 历史扫描结果的个数
 WifiApInfo *WifiGetScanHistoryResult(uint8_t *apNum);
+
+// WifiIsConnectBusy 是否连接忙碌
+bool WifiIsConnectBusy(void);
+
+// WifiIsScanBusy 是否扫描忙碌
+bool WifiIsScanBusy(void);
 
 #endif
