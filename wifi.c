@@ -38,7 +38,8 @@
 static int mid = -1;
 
 static bool isStart = false;
-static bool isBusy = false;
+static bool isScanBusy = false;
+static bool isConnectBusy = false;
 static bool isWifiStart = false;
 
 // 是否有扫描结果.有则需要推送
@@ -124,7 +125,7 @@ static int task(void) {
     PT_BEGIN(&pt);
 
     if (isHaveScanResult) {
-        isBusy = false;
+        isScanBusy = false;
         if (scanResultCallback != NULL) {
             LD(TAG, "push scan result.ap num:%d", gScanApNum);
             scanResultCallback(gScanApInfo, gScanApNum);
@@ -136,7 +137,7 @@ static int task(void) {
     }
 
     if (isHaveConnectResult) {
-        isBusy = false;
+        isConnectBusy = false;
         if (connectResultCallback != NULL) {
             LI(TAG, "push connect result.is connect:%d", isConnect);
             connectResultCallback(isConnect);
@@ -192,9 +193,14 @@ static void eventHandler(void *arg, esp_event_base_t eventBase, int32_t eventID,
     }
 }
 
-// WifiIsBusy 是否忙碌
-bool WifiIsBusy(void) {
-    return (isBusy & isStart);
+// WifiIsConnectBusy 是否连接忙碌
+bool WifiIsConnectBusy(void) {
+    return (isConnectBusy & isStart);
+}
+
+// WifiIsScanBusy 是否扫描忙碌
+bool WifiIsScanBusy(void) {
+    return (isScanBusy & isStart);
 }
 
 // WifiScan 启动扫描热点
@@ -205,12 +211,12 @@ bool WifiScan(void) {
         return false;
     }
 
-    if (isBusy) {
+    if (isScanBusy == true) {
         LW(TAG, "wifi scan failed,because is busy!");
         return false;
     }
 
-    isBusy = true;
+    isScanBusy = true;
     isHaveScanResult = false;
     gScanApNum = 0;
 
@@ -315,7 +321,7 @@ bool WifiConnect(char *ssid, char *pwd, wifi_auth_mode_t authMode) {
         return false;
     }
 
-    if (isBusy) {
+    if (isConnectBusy == true) {
         LW(TAG, "connect start failed!is busy");
         return false;
     }
@@ -340,7 +346,7 @@ bool WifiConnect(char *ssid, char *pwd, wifi_auth_mode_t authMode) {
     strcpy(connectInfo.Pwd, pwd);
     connectInfo.Authmode = authMode;
 
-    isBusy = true;
+    isConnectBusy = true;
     isStartConnect = true;
     isHaveConnectResult = false;
     BrorThreadCreate(connectThread, "connectThread", BROR_THREAD_PRIORITY_LOWEST, CONNECT_THREAD_SIZE);
