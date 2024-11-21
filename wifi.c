@@ -28,28 +28,35 @@
 #define MALLOC_TOTAL 2048
 
 #define WIFI_CONNECTED_BIT BIT0
-#define WIFI_FAIL_BIT BIT1
+#define WIFI_DISCONNECTED_BIT BIT1
+#define WIFI_FAIL_BIT BIT2
 
 #define WIFI_MAC_LEN 6
 
 // 支持扫描列表的最大数
 #define SCAN_AP_NUM_MAX 10
 
+typedef enum {
+    IDLE,
+    SCAN,
+    CONNECT,
+} tState;
+
 static int mid = -1;
 
-static bool isStart = false;
-static bool isScanBusy = false;
-static bool isConnectBusy = false;
+static bool gIsTriggerScan = false;
+static bool gIsTriggerConnect = false;
+static tState gState = IDLE;
+
+static bool gIsLoad = false;
 static bool isWifiStart = false;
+static bool isConnect = false;
 
 // 是否有扫描结果.有则需要推送
 static bool isHaveScanResult = false;
 static WifiApInfo gScanApInfo[SCAN_AP_NUM_MAX] = {0};
 static int gScanApNum = 0;
-static int gScanApHistoryNum = 0;
 
-static bool isConnect = false;
-static bool isStartConnect = false;
 // 是否有连接结果.有则需要推送
 static bool isHaveConnectResult = false;
 static WifiConnectInfo connectInfo;
@@ -59,7 +66,7 @@ static EventGroupHandle_t wifiEventGroup;
 static WifiScanResultFunc scanResultCallback = NULL;
 static WifiConnectResultFunc connectResultCallback = NULL;
 
-static wifi_ap_record_t apInfo;
+static wifi_ap_record_t gApInfo;
 
 static uint8_t gWifiMac[6] = {0};
 
@@ -67,14 +74,16 @@ static int task(void);
 static void eventHandler(void *arg, esp_event_base_t eventBase, int32_t eventID,
                          void *eventData);
 
-static void scanThread(void *param);
-static void connectThread(void *param);
 static bool isRepeat(uint8_t *ssid);
+static void mainThread(void *param);
+static bool checkTrigger(void);
+static void scan(void);
+static void connect(void);
 
 // WifiLoad 模块载入
 // 载入之前需初始化nvs_flash_init,esp_netif_init,esp_event_loop_create_default
 bool WifiLoad(char *hostname) {
-    mid = TZMallocRegister(0, "wifi", MALLOC_TOTAL);
+    mid = TZMallocRegister(0, TAG, MALLOC_TOTAL);
     if (mid == -1) {
         return false;
     }
@@ -104,7 +113,7 @@ bool WifiLoad(char *hostname) {
         return false;
     }
     if (esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP,
-                                            &eventHandler, NULL, &instanceGotIP)) {
+                                            eventHandler, NULL, &instanceGotIP)) {
         return false;
     }
 
@@ -114,7 +123,8 @@ bool WifiLoad(char *hostname) {
 
     esp_wifi_get_mac(WIFI_IF_STA, gWifiMac);
 
-    isStart = true;
+    BrorThreadCreate(mainThread, "wifi_task", BROR_THREAD_PRIORITY_LOWEST, SCAN_THREAD_SIZE);
+    gIsLoad = true;
 
     return true;
 }
@@ -124,25 +134,28 @@ static int task(void) {
 
     PT_BEGIN(&pt);
 
-    if (isHaveScanResult) {
-        isScanBusy = false;
+    PT_WAIT_UNTIL(&pt, gIsLoad == true && isWifiStart == true);
+
+    if (gState == SCAN && isHaveScanResult == true) {
         if (scanResultCallback != NULL) {
             LD(TAG, "push scan result.ap num:%d", gScanApNum);
             scanResultCallback(gScanApInfo, gScanApNum);
         }
-        if (gScanApNum > 0) {
-            gScanApNum = 0;
-        }
+
         isHaveScanResult = false;
+        gState = IDLE;
+
+        PT_EXIT(&pt);
     }
 
-    if (isHaveConnectResult) {
-        isConnectBusy = false;
+    if (gState == CONNECT && isHaveConnectResult == true) {
         if (connectResultCallback != NULL) {
             LI(TAG, "push connect result.is connect:%d", isConnect);
             connectResultCallback(isConnect);
         }
+
         isHaveConnectResult = false;
+        gState = IDLE;
     }
 
     PT_END(&pt);
@@ -150,88 +163,107 @@ static int task(void) {
 
 static void eventHandler(void *arg, esp_event_base_t eventBase, int32_t eventID,
                          void *eventData) {
-    static int retryNum = 0;
-
     LD(TAG, "event base:%s,id:%d", eventBase, eventID);
-    if (eventBase == WIFI_EVENT && eventID == WIFI_EVENT_STA_START && isStartConnect) {
+    if (eventBase == WIFI_EVENT && eventID == WIFI_EVENT_STA_START) {
         LD(TAG, "wifi connect ap start");
-        esp_wifi_connect();
         return;
     }
 
     if (eventBase == WIFI_EVENT && eventID == WIFI_EVENT_STA_DISCONNECTED) {
-        LW(TAG, "wifi disconnect!");
         isConnect = false;
 
-        if (isStartConnect) {
-            if (retryNum < WIFI_CONNECT_RETRY_MAX) {
-                retryNum++;
-                LD(TAG, "wifi connect ap retry:%d", retryNum);
-                esp_wifi_connect();
-            } else {
-                LE(TAG, "wifi connect failed!retry too many");
-                xEventGroupSetBits(wifiEventGroup, WIFI_FAIL_BIT);
-                isHaveConnectResult = true;
-            }
+        if (gState == CONNECT) {
+            LE(TAG, "wifi connect fail!");
+            xEventGroupSetBits(wifiEventGroup, WIFI_FAIL_BIT);
         } else {
-            isHaveConnectResult = true;
+            LE(TAG, "wifi disconnect!");
+            xEventGroupSetBits(wifiEventGroup, WIFI_DISCONNECTED_BIT);
         }
+
         return;
     }
 
     if (eventBase == IP_EVENT && eventID == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t *event = (ip_event_got_ip_t *)eventData;
-        retryNum = 0;
         isConnect = true;
 
         connectInfo.IP = ntohl(event->ip_info.ip.addr);
         connectInfo.Gateway = ntohl(event->ip_info.gw.addr);
 
         LI(TAG, "connect success.ip:0x%x gw:0x%x", connectInfo.IP, connectInfo.Gateway);
-        isHaveConnectResult = true;
         xEventGroupSetBits(wifiEventGroup, WIFI_CONNECTED_BIT);
     }
 }
 
-// WifiIsConnectBusy 是否连接忙碌
-bool WifiIsConnectBusy(void) {
-    return (isConnectBusy & isStart);
+static void mainThread(void *param) {
+    while (1) {
+        if (checkTrigger() == false) {
+            BrorDelayMS(10);
+            continue;
+        }
+
+        switch (gState) {
+        case IDLE:
+            break;
+        case SCAN:
+            scan();
+            isHaveScanResult = true;
+            break;
+        case CONNECT:
+            connect();
+            isHaveConnectResult = true;
+            break;
+        default:
+            break;
+        }
+    }
 }
 
-// WifiIsScanBusy 是否扫描忙碌
-bool WifiIsScanBusy(void) {
-    return (isScanBusy & isStart);
+static bool checkTrigger(void) {
+    if (gState != IDLE) {
+        return false;
+    }
+
+    if (gIsTriggerConnect == true) {
+        gState = CONNECT;
+        gIsTriggerConnect = false;
+        return true;
+    } else if (gIsTriggerScan == true) {
+        gState = SCAN;
+        gIsTriggerScan = false;
+        return true;
+    }
+
+    return false;
+}
+
+// WifiIsBusy 是否连接忙碌
+bool WifiIsBusy(void) {
+    return gState != IDLE || gIsTriggerConnect == true || gIsTriggerScan == true;
 }
 
 // WifiScan 启动扫描热点
 // 返回false说明驱动正忙
 bool WifiScan(void) {
-    if (isStart == false) {
+    if (gIsLoad == false) {
         LW(TAG, "wifi not start!");
         return false;
     }
 
-    if (isScanBusy == true) {
-        LW(TAG, "wifi scan failed,because is busy!");
+    if (WifiIsBusy() == true) {
+        LW(TAG, "scan start failed!is busy");
         return false;
     }
 
-    isScanBusy = true;
-    isHaveScanResult = false;
-    gScanApNum = 0;
+    gIsTriggerScan = true;
 
-    LD(TAG, "wifi scan start!create thread to scan");
-    BrorThreadCreate(scanThread, "scanThread", BROR_THREAD_PRIORITY_LOWEST, SCAN_THREAD_SIZE);
+    LD(TAG, "wifi trigger scan!");
+
     return true;
 }
 
-static void scanThread(void *param) {
+static void scan(void) {
     wifi_ap_record_t *apInfo = NULL;
-
-    if (scanResultCallback == NULL) {
-        LE(TAG, "scan failed!callback is null");
-        goto EXIT;
-    }
 
     if (esp_wifi_set_mode(WIFI_MODE_STA) != ESP_OK) {
         LE(TAG, "scan failed!set mode failed");
@@ -293,15 +325,11 @@ static void scanThread(void *param) {
         }
     }
 
-    gScanApHistoryNum = gScanApNum;
-
 EXIT:
-    isHaveScanResult = true;
     if (apInfo != NULL) {
         vPortFree(apInfo);
     }
     esp_wifi_scan_stop();
-    BrorThreadDeleteMe();
 }
 
 static bool isRepeat(uint8_t *ssid) {
@@ -316,21 +344,13 @@ static bool isRepeat(uint8_t *ssid) {
 
 // WifiConnect 启动连接热点
 bool WifiConnect(char *ssid, char *pwd, wifi_auth_mode_t authMode) {
-    if (isStart == false) {
+    if (gIsLoad == false) {
         LW(TAG, "wifi not start!");
         return false;
     }
 
-    if (isConnectBusy == true) {
+    if (WifiIsBusy() == true) {
         LW(TAG, "connect start failed!is busy");
-        return false;
-    }
-    if (isConnect) {
-        LW(TAG, "connect start failed!is connect");
-        return false;
-    }
-    if (isStartConnect) {
-        LW(TAG, "connect start failed!is start connect");
         return false;
     }
 
@@ -341,28 +361,21 @@ bool WifiConnect(char *ssid, char *pwd, wifi_auth_mode_t authMode) {
         return false;
     }
 
-    LI(TAG, "connect start");
     strcpy(connectInfo.Ssid, ssid);
     strcpy(connectInfo.Pwd, pwd);
     connectInfo.Authmode = authMode;
 
-    isConnectBusy = true;
-    isStartConnect = true;
-    isHaveConnectResult = false;
-    BrorThreadCreate(connectThread, "connectThread", BROR_THREAD_PRIORITY_LOWEST, CONNECT_THREAD_SIZE);
+    LI(TAG, "wifi trigger connect!");
+
+    gIsTriggerConnect = true;
 
     return true;
 }
 
-static void connectThread(void *param) {
-    if (connectResultCallback == NULL) {
-        LE(TAG, "connect failed!callback is null");
-        goto EXIT;
-    }
-
+static void connect(void) {
     if (esp_wifi_set_mode(WIFI_MODE_STA) != ESP_OK) {
         LE(TAG, "connect failed!set mode failed");
-        goto EXIT;
+        return;
     }
 
     wifi_config_t wifiConfig = {
@@ -379,44 +392,49 @@ static void connectThread(void *param) {
     }
     if (esp_wifi_set_config(WIFI_IF_STA, &wifiConfig) != ESP_OK) {
         LE(TAG, "connect failed!set config failed");
-        goto EXIT;
+        return;
     }
 
     if (isWifiStart == false) {
         if (esp_wifi_start() != ESP_OK) {
             LE(TAG, "connect failed!wifi start failed");
-            goto EXIT;
+            return;
         }
         isWifiStart = true;
-    } else {
-        LI(TAG, "wifi connect ap start");
-        esp_wifi_connect();
     }
+
+    LI(TAG, "wifi connect ap start");
+    esp_wifi_connect();
 
     LI(TAG, "connect start,wait result");
     // 等待事件
-    xEventGroupWaitBits(wifiEventGroup, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
-                        pdFALSE, pdFALSE, portMAX_DELAY);
+    xEventGroupWaitBits(wifiEventGroup, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT, pdTRUE, pdFALSE, portMAX_DELAY);
 
-    isStartConnect = false;
-    BrorThreadDeleteMe();
-    return;
-
-EXIT:
-    isHaveConnectResult = true;
-    isStartConnect = false;
-    BrorThreadDeleteMe();
+    LI(TAG, "connect end");
 }
 
 // WifiDisconnect 断开连接
-void WifiDisconnect(void) {
-    if (isConnect == false || isStart == false) {
-        return;
+bool WifiDisconnect(void) {
+    if (WifiIsBusy() == true) {
+        LE(TAG, "disconnect start failed!is busy");
+        return false;
     }
 
-    esp_wifi_disconnect();
+    if (WifiIsConnect() == false) {
+        LE(TAG, "disconnect start failed!is not connect");
+        return false;
+    }
+
+    if (esp_wifi_disconnect() != ESP_OK) {
+        LE(TAG, "disconnect start failed!disconnect failed");
+        return false;
+    }
+
+    LI(TAG, "disconnect");
+
     memset(&connectInfo, 0, sizeof(connectInfo));
-    isConnect = false;
+
+    return true;
 }
 
 // WifiIsConnect 是否已连接
@@ -427,7 +445,7 @@ bool WifiIsConnect(void) {
 // WifiGetConnectInfo 读取当前已连接的信息
 // 如果未连接则返回NULL
 WifiConnectInfo *WifiGetConnectInfo(void) {
-    if (isConnect == false) {
+    if (WifiIsConnect() == false) {
         return NULL;
     }
     return &connectInfo;
@@ -445,13 +463,13 @@ void WifiSetCallbackConnectResult(WifiConnectResultFunc func) {
 
 // WifiGetRssi 获取wifi的rssi
 int8_t WifiGetRssi(void) {
-    if (isConnect == false) {
+    if (WifiIsConnect() == false) {
         return 0;
     }
 
-    esp_wifi_sta_get_ap_info(&apInfo);
+    esp_wifi_sta_get_ap_info(&gApInfo);
 
-    return apInfo.rssi;
+    return gApInfo.rssi;
 }
 
 // WifiGetMac 获取mac地址
@@ -462,6 +480,11 @@ void WifiGetMac(uint8_t mac[6]) {
 // WifiGetScanHistoryResult 获取历史扫描结果
 // apNum 历史扫描结果的个数
 WifiApInfo *WifiGetScanHistoryResult(uint8_t *apNum) {
-    *apNum = gScanApHistoryNum;
+    if (gState == SCAN) {
+        *apNum = 0;
+        return NULL;
+    }
+
+    *apNum = gScanApNum;
     return gScanApInfo;
 }

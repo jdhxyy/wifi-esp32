@@ -65,7 +65,7 @@ bool WifiScan(void);
 bool WifiConnect(char *ssid, char *pwd, wifi_auth_mode_t authMode);
 
 // WifiDisconnect 断开连接
-void WifiDisconnect(void);
+bool WifiDisconnect(void);
 
 // WifiIsConnect 是否已连接
 bool WifiIsConnect(void);
@@ -90,10 +90,7 @@ void WifiSetCallbackConnectResult(WifiConnectResultFunc func);
 // apNum 历史扫描结果的个数
 WifiApInfo *WifiGetScanHistoryResult(uint8_t *apNum);
 
-// WifiIsConnectBusy 是否连接忙碌
-bool WifiIsConnectBusy(void);
-
-// WifiIsScanBusy 是否扫描忙碌
-bool WifiIsScanBusy(void);
+// WifiIsBusy 是否连接忙碌
+bool WifiIsBusy(void);
 
 #endif
