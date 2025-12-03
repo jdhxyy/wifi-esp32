@@ -432,6 +432,7 @@ bool WifiDisconnect(void) {
 
     LI(TAG, "disconnect");
 
+    isConnect = false;
     memset(&connectInfo, 0, sizeof(connectInfo));
 
     return true;
