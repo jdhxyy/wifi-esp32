@@ -9,6 +9,7 @@
 #include "tzmalloc.h"
 
 #include <string.h>
+#include <arpa/inet.h>
 
 #include "esp_event.h"
 #include "esp_system.h"
@@ -100,7 +101,11 @@ bool WifiLoad(char *hostname) {
 
     // 设置WIFI主机名
     if (hostname != NULL) {
-        tcpip_adapter_set_hostname(TCPIP_ADAPTER_IF_STA, hostname);
+        // 更换为新的API
+        if (esp_netif_set_hostname(sta_netif, hostname) != ESP_OK) {
+            LE(TAG, "Failed to set WiFi hostname");
+            return false;
+        }
     }
 
     // 事件组.用于连接
