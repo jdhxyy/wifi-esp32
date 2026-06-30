@@ -1,5 +1,5 @@
 // Copyright 2021-2021 The SUMEC Authors. All rights reserved.
-// esp32µÄWIFIÇı¶¯
+// esp32çš„WIFIé©±åŠ¨
 // Authors: jdh99 <jdh821@163.com>
 
 #include "wifi.h"
@@ -13,18 +13,19 @@
 #include "esp_event.h"
 #include "esp_system.h"
 #include "esp_wifi.h"
+#include "esp_netif.h"
 #include "freertos/event_groups.h"
 #include "nvs_flash.h"
 
 #define TAG "wifi"
 
-// ÈÎÎñÔËĞĞ¼ä¸ô.µ¥Î»:ms
+// ä»»åŠ¡è¿è¡Œé—´éš”.å•ä½:ms
 #define TASK_INTERVAL 100
 
 #define SCAN_THREAD_SIZE 4096
 #define CONNECT_THREAD_SIZE 4096
 
-// tzmalloc×Ö½ÚÊı
+// tzmallocå­—èŠ‚æ•°
 #define MALLOC_TOTAL 2048
 
 #define WIFI_CONNECTED_BIT BIT0
@@ -33,7 +34,7 @@
 
 #define WIFI_MAC_LEN 6
 
-// Ö§³ÖÉ¨ÃèÁĞ±íµÄ×î´óÊı
+// æ”¯æŒæ‰«æåˆ—è¡¨çš„æœ€å¤§æ•°
 #define SCAN_AP_NUM_MAX 10
 
 typedef enum {
@@ -52,12 +53,12 @@ static bool gIsLoad = false;
 static bool isWifiStart = false;
 static bool isConnect = false;
 
-// ÊÇ·ñÓĞÉ¨Ãè½á¹û.ÓĞÔòĞèÒªÍÆËÍ
+// æ˜¯å¦æœ‰æ‰«æç»“æœ.æœ‰åˆ™éœ€è¦æ¨é€
 static bool isHaveScanResult = false;
 static WifiApInfo gScanApInfo[SCAN_AP_NUM_MAX] = {0};
 static int gScanApNum = 0;
 
-// ÊÇ·ñÓĞÁ¬½Ó½á¹û.ÓĞÔòĞèÒªÍÆËÍ
+// æ˜¯å¦æœ‰è¿æ¥ç»“æœ.æœ‰åˆ™éœ€è¦æ¨é€
 static bool isHaveConnectResult = false;
 static WifiConnectInfo connectInfo;
 
@@ -80,8 +81,8 @@ static bool checkTrigger(void);
 static void scan(void);
 static void connect(void);
 
-// WifiLoad Ä£¿éÔØÈë
-// ÔØÈëÖ®Ç°Ğè³õÊ¼»¯nvs_flash_init,esp_netif_init,esp_event_loop_create_default
+// WifiLoad æ¨¡å—è½½å…¥
+// è½½å…¥ä¹‹å‰éœ€åˆå§‹åŒ–nvs_flash_init,esp_netif_init,esp_event_loop_create_default
 bool WifiLoad(char *hostname) {
     mid = TZMallocRegister(0, TAG, MALLOC_TOTAL);
     if (mid == -1) {
@@ -98,12 +99,12 @@ bool WifiLoad(char *hostname) {
         return false;
     }
 
-    // ÉèÖÃWIFIÖ÷»úÃû
+    // è®¾ç½®WIFIä¸»æœºå
     if (hostname != NULL) {
-        tcpip_adapter_set_hostname(TCPIP_ADAPTER_IF_STA, hostname);
+        esp_netif_set_hostname(esp_netif_get_handle_from_ifkey("WIFI_STA_DEF"), hostname);
     }
 
-    // ÊÂ¼ş×é.ÓÃÓÚÁ¬½Ó
+    // äº‹ä»¶ç»„.ç”¨äºè¿æ¥
     wifiEventGroup = xEventGroupCreate();
 
     esp_event_handler_instance_t instanceAnyID;
@@ -237,13 +238,13 @@ static bool checkTrigger(void) {
     return false;
 }
 
-// WifiIsBusy ÊÇ·ñÁ¬½ÓÃ¦Âµ
+// WifiIsBusy æ˜¯å¦è¿æ¥å¿™ç¢Œ
 bool WifiIsBusy(void) {
     return gState != IDLE || gIsTriggerConnect == true || gIsTriggerScan == true;
 }
 
-// WifiScan Æô¶¯É¨ÃèÈÈµã
-// ·µ»ØfalseËµÃ÷Çı¶¯ÕıÃ¦
+// WifiScan å¯åŠ¨æ‰«æçƒ­ç‚¹
+// è¿”å›falseè¯´æ˜é©±åŠ¨æ­£å¿™
 bool WifiScan(void) {
     if (gIsLoad == false) {
         LW(TAG, "wifi not start!");
@@ -342,7 +343,7 @@ static bool isRepeat(uint8_t *ssid) {
     return false;
 }
 
-// WifiConnect Æô¶¯Á¬½ÓÈÈµã
+// WifiConnect å¯åŠ¨è¿æ¥çƒ­ç‚¹
 bool WifiConnect(char *ssid, char *pwd, wifi_auth_mode_t authMode) {
     if (gIsLoad == false) {
         LW(TAG, "wifi not start!");
@@ -407,13 +408,13 @@ static void connect(void) {
     esp_wifi_connect();
 
     LI(TAG, "connect start,wait result");
-    // µÈ´ıÊÂ¼ş
+    // ç­‰å¾…äº‹ä»¶
     xEventGroupWaitBits(wifiEventGroup, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT, pdTRUE, pdFALSE, portMAX_DELAY);
 
     LI(TAG, "connect end");
 }
 
-// WifiDisconnect ¶Ï¿ªÁ¬½Ó
+// WifiDisconnect æ–­å¼€è¿æ¥
 bool WifiDisconnect(void) {
     if (WifiIsBusy() == true) {
         LE(TAG, "disconnect start failed!is busy");
@@ -438,13 +439,13 @@ bool WifiDisconnect(void) {
     return true;
 }
 
-// WifiIsConnect ÊÇ·ñÒÑÁ¬½Ó
+// WifiIsConnect æ˜¯å¦å·²è¿æ¥
 bool WifiIsConnect(void) {
     return isConnect;
 }
 
-// WifiGetConnectInfo ¶ÁÈ¡µ±Ç°ÒÑÁ¬½ÓµÄĞÅÏ¢
-// Èç¹ûÎ´Á¬½ÓÔò·µ»ØNULL
+// WifiGetConnectInfo è¯»å–å½“å‰å·²è¿æ¥çš„ä¿¡æ¯
+// å¦‚æœæœªè¿æ¥åˆ™è¿”å›NULL
 WifiConnectInfo *WifiGetConnectInfo(void) {
     if (WifiIsConnect() == false) {
         return NULL;
@@ -452,17 +453,17 @@ WifiConnectInfo *WifiGetConnectInfo(void) {
     return &connectInfo;
 }
 
-// WifiSetCallbackScanResult ÉèÖÃÉ¨Ãè»Øµ÷
+// WifiSetCallbackScanResult è®¾ç½®æ‰«æå›è°ƒ
 void WifiSetCallbackScanResult(WifiScanResultFunc func) {
     scanResultCallback = func;
 }
 
-// WifiSetCallbackConnectResult ÉèÖÃÁ¬½Ó»Øµ÷
+// WifiSetCallbackConnectResult è®¾ç½®è¿æ¥å›è°ƒ
 void WifiSetCallbackConnectResult(WifiConnectResultFunc func) {
     connectResultCallback = func;
 }
 
-// WifiGetRssi »ñÈ¡wifiµÄrssi
+// WifiGetRssi è·å–wifiçš„rssi
 int8_t WifiGetRssi(void) {
     if (WifiIsConnect() == false) {
         return 0;
@@ -473,13 +474,13 @@ int8_t WifiGetRssi(void) {
     return gApInfo.rssi;
 }
 
-// WifiGetMac »ñÈ¡macµØÖ·
+// WifiGetMac è·å–macåœ°å€
 void WifiGetMac(uint8_t mac[6]) {
     memcpy(mac, gWifiMac, sizeof(gWifiMac));
 }
 
-// WifiGetScanHistoryResult »ñÈ¡ÀúÊ·É¨Ãè½á¹û
-// apNum ÀúÊ·É¨Ãè½á¹ûµÄ¸öÊı
+// WifiGetScanHistoryResult è·å–å†å²æ‰«æç»“æœ
+// apNum å†å²æ‰«æç»“æœçš„ä¸ªæ•°
 WifiApInfo *WifiGetScanHistoryResult(uint8_t *apNum) {
     if (gState == SCAN) {
         *apNum = 0;
